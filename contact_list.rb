@@ -6,3 +6,7 @@ class ContactList
   # TODO: Implement user interaction. This should be the only file where you use `puts` and `gets`.
 
 end
+
+# p Contact.create("Jeremy", "legendinhisownmind@gmail.com")
+# p Contact.find(2)
+p Contact.search("imon")
