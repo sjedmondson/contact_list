@@ -1,67 +1,87 @@
 require 'csv'
 require 'pry'
+require 'pg'
 
-# Represents a person in an address book.
-# The ContactList class will work with Contact objects instead of interacting with the CSV file directly
 class Contact
 
+  @@connection = nil
+
+  attr_reader :id
   attr_accessor :name, :email
   
-  # Creates a new contact object
-  # @param name [String] The contact's name
-  # @param email [String] The contact's email address
-  def initialize(name, email)
-    @name = name
-    @email = email
+  def initialize(row={})
+    @id = row["id"]
+    @name = row["name"]
+    @email = row["email"]
   end
 
-  # Provides functionality for managing contacts in the csv file.
+  def to_s
+    "ID: #{id} Name: #{name}"
+  end
+
+  def save
+    if id
+      result = Contact.connection.exec_params(
+        'UPDATE contacts SET name = $1, email = $2 WHERE id = $3::int', 
+        [name, email, id]
+      )
+    else
+      result = Contact.connection.exec_params(
+        'INSERT INTO contacts (name, email) VALUES ($1, $2)', 
+        [name, email]
+      )
+    end
+  end
+
+  def destroy
+    result = Contact.connection.exec_params(
+      'DELETE FROM contacts WHERE id = $1::int', 
+      [id]
+    )
+  end
+
   class << self
 
-    # Opens 'contacts.csv' and creates a Contact object for each line in the file (aka each contact).
-    # @return [Array<Contact>] Array of Contact objects
-    def all
-      # TODO: Return an Array of Contact instances made from the data in 'contacts.csv'.
-      CSV.read("contacts.csv")
+    def connection
+      @@connection = @@connection || PG.connect(
+      host: 'localhost',
+      dbname: 'contact_list',
+      user: 'development',
+      password: 'development'
+      )
     end
 
-    # Creates a new contact, adding it to the csv file, returning the new contact.
-    # @param name [String] the new contact's name
-    # @param email [String] the contact's email
+    def all
+      result = Contact.connection.exec('SELECT * FROM contacts')
+      result.each { |row| puts row }
+    end
+
     def create(name, email)
-      # TODO: Instantiate a Contact, add its data to the 'contacts.csv' file, and return it.
-      array = CSV.read("contacts.csv")
-      next_id = array.length + 1
       new_contact = Contact.new(name, email)
-      CSV.open("contacts.csv", "ab") do |row|
-        row << [next_id, new_contact.name, new_contact.email]
-      end
+      new_contact.save
       new_contact
     end
     
-    # Find the Contact in the 'contacts.csv' file with the matching id.
-    # @param id [Integer] the contact id
-    # @return [Contact, nil] the contact with the specified id. If no contact has the id, returns nil.
     def find(id)
-      # TODO: Find the Contact in the 'contacts.csv' file with the matching id.
-      array = CSV.read("contacts.csv")
-      array.find do |contact|
-        # puts " DEBUG1: " + contact.to_s
-        # puts " DEBUG2: #{contact[0] == 2}"
-        # puts " #{contact[0].class} #{2.class}"
-        contact[0].to_i == id
+      result = Contact.connection.exec_params('SELECT * FROM contacts WHERE id = $1::int', [id])
+      if result.ntuples == 1
+        Contact.new(result[0])
+      else
+        "The ID #{id} does not exist"
       end
     end
     
-    # Search for contacts by either name or email.
-    # @param term [String] the name fragment or email fragment to search for
-    # @return [Array<Contact>] Array of Contact objects.
     def search(term)
-      # TODO: Select the Contact instances from the 'contacts.csv' file whose name or email attributes contain the search term.
-      array = CSV.read("contacts.csv")
-      array.select do |contact|
-        contact[1].include?(term) || contact[2].include?(term)
+      result = Contact.connection.exec_params('SELECT * FROM contacts WHERE name ILIKE $1 ORDER BY id', ["%#{term}%"])
+      if result.ntuples >= 1
+        Contact.new(result.first)
+      else
+        "There are no matches for #{term}"
       end
+      # array = CSV.read("contacts.csv")
+      # array.select do |contact|
+      #   contact[1].include?(term) || contact[2].include?(term)
+      # end
     end
 
   end

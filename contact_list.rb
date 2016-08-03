@@ -12,13 +12,24 @@ class ContactList
     when "show"
       puts Contact.find(ARGV[1].to_i)
     when "search"
-      puts Contact.search(ARGV[1])
+      result = Contact.search(ARGV[1])
+      result.each {|row| puts row}
     when "new"
       puts "Please enter the full name of the new contact"
       name = STDIN.gets.strip 
       puts "Please enter the contact's e-mail address"
       email = STDIN.gets.strip
       puts Contact.create(name, email)
+    when "update"
+      contact = Contact.find(ARGV[1].to_i)
+      puts "Please enter new full name"
+      contact.name = STDIN.gets.strip
+      puts "Please enter new email address"
+      contact.email = STDIN.gets.strip
+      contact.save
+    when "delete"
+      contact = Contact.find(ARGV[1].to_i)
+      contact.destroy
     else
       menu
     end
@@ -31,6 +42,8 @@ class ContactList
     puts "list   - List all contacts"
     puts "show   - Show an individual contact"
     puts "search - Search contacts"
+    puts "update - Update an existing contact"
+    puts "delete - Delete a contact"
   end  
 
 end
